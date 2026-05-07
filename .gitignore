@@ -1,0 +1,10 @@
+backend/venv/
+
+__pycache__/
+*.pyc
+*.pyo
+
+backend/uploads/
+backend/outputs/
+
+backend/models/*.pt
