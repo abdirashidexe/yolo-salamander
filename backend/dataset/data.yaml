@@ -1,4 +1,4 @@
-path: backend/dataset
+path: /home/shawn003/yolo-salamander/backend/dataset
 
 train: images/train
 val: images/val
