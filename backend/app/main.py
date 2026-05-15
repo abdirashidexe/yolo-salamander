@@ -1,3 +1,4 @@
+from collections import defaultdict
 import time
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File
@@ -59,27 +60,46 @@ def start_track(video: UploadFile = File(...)):
         (width, height)
     )
 
+# --- NEW: Initialize metric dictionaries before the loop ---
+    frames_seen = defaultdict(int)
+    label_for = {}
+
     # 3. Loop through frames and run YOLO tracking
     for frame_idx in range(total):
         ok, frame = cap.read()
         if not ok:
             break
             
-        # persist=True gives each salamander a consistent ID across frames!
         result = model.track(frame, persist=True, verbose=False)[0]
-        
-        # Write the annotated frame to the new video
         writer.write(result.plot())
         
-        # Print progress to the terminal every 30 frames
+        # --- NEW: Extract IDs and count frames per individual ---
+        boxes = result.boxes
+        if boxes is not None and boxes.id is not None:
+            # boxes.id and boxes.cls are tensors, convert to standard lists
+            for tid, cls_id in zip(boxes.id.tolist(), boxes.cls.tolist()):
+                frames_seen[int(tid)] += 1
+                label_for[int(tid)] = model.names[int(cls_id)]
+        
         if frame_idx % 30 == 0:
             print(f"Processed frame {frame_idx}/{total}")
 
     cap.release()
     writer.release()
     
-    # 4. Return the URL to the *newly annotated* video
+    # --- NEW: Convert frame counts to seconds for the frontend ---
+    tracks = [
+        {
+            "track_id": tid,
+            "time_on_screen_s": round(count / fps, 2),
+            "label": label_for[tid],
+        }
+        for tid, count in frames_seen.items()
+    ]
+
+    # 4. Return the URL and the new tracks data
     return {
         "status": "done",
         "video_url": f"http://localhost:8000/outputs/output.webm?t={int(time.time())}",
+        "tracks": tracks,
     }
