@@ -1,10 +1,39 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import './index.css';
 
 export default function App() {
   const [file, setFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
+  const [heatmapUrl, setHeatmapUrl] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [tracks, setTracks] = useState([]); // <-- NEW: State for metrics
+  const [percent, setPercent] = useState(0);
+  const [tracks, setTracks] = useState([]);
+  
+  const pollInterval = useRef(null);
+
+  const pollStatus = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/track");
+      const data = await res.json();
+
+      if (data.status === "processing") {
+        setPercent(data.percent || 0);
+      } else if (data.status === "done") {
+        setPercent(100);
+        setVideoUrl(data.result.video_url);
+        setHeatmapUrl(data.result.heatmap_url);
+        setTracks(data.result.tracks || []);
+        setIsProcessing(false);
+        clearInterval(pollInterval.current);
+      } else if (data.status === "error") {
+        console.error("Backend error:", data.message);
+        setIsProcessing(false);
+        clearInterval(pollInterval.current);
+      }
+    } catch (err) {
+      console.error("Polling error:", err);
+    }
+  };
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -12,80 +41,100 @@ export default function App() {
 
     setIsProcessing(true);
     setVideoUrl(null);
-    setTracks([]); // Clear old metrics
+    setHeatmapUrl(null);
+    setTracks([]);
+    setPercent(0);
 
     const form = new FormData();
     form.append("video", file);
 
     try {
-      const response = await fetch("http://localhost:8000/track", { 
+      await fetch("http://localhost:8000/track", { 
         method: "POST", 
         body: form 
       });
-      const data = await response.json();
-      setVideoUrl(data.video_url);
-      
-      // <-- NEW: Save the tracks data to state
-      if (data.tracks) {
-        setTracks(data.tracks);
-      }
+      pollInterval.current = setInterval(pollStatus, 1000);
     } catch (error) {
       console.error("Error uploading video:", error);
-    } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>Salamander Tracker</h1>
+    <div className="app-container">
+      <header>
+        <h1>Salamander Tracker</h1>
+        <p style={{ color: 'var(--text-muted)' }}>AI-Powered YOLO Detection & Metrics</p>
+        
+        {/* Route Links opening in new tabs */}
+        <div className="nav-links">
+          <a href="http://localhost:5173/" target="_blank" rel="noopener noreferrer">Frontend Home</a>
+          <a href="http://localhost:8000/" target="_blank" rel="noopener noreferrer">Backend Health</a>
+          <a href="http://localhost:8000/track" target="_blank" rel="noopener noreferrer">API Polling (/track)</a>
+        </div>
+      </header>
       
-      <form onSubmit={handleUpload} style={{ marginBottom: '20px' }}>
-        <input 
-          type="file" 
-          accept="video/*"
-          onChange={(e) => setFile(e.target.files[0])} 
-        />
-        <button type="submit" disabled={isProcessing}>
-          {isProcessing ? "Processing..." : "Upload & Track"}
-        </button>
-      </form>
+      <main>
+        <div className="card upload-form">
+          <form onSubmit={handleUpload} style={{ display: 'flex', alignItems: 'center' }}>
+            <input 
+              type="file" 
+              accept="video/*"
+              onChange={(e) => setFile(e.target.files[0])} 
+            />
+            <button className="btn" type="submit" disabled={isProcessing}>
+              {isProcessing ? "Processing..." : "Upload & Track"}
+            </button>
+          </form>
 
-      {isProcessing && <p style={{ color: "blue" }}>Running YOLO inference... Check backend terminal for progress!</p>}
-
-      {videoUrl && (
-        <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
-          <div>
-            <h3>Annotated Video</h3>
-            <video src={videoUrl} controls width="600" />
-          </div>
-          
-          {/* NEW: Render the metrics table */}
-          {tracks.length > 0 && (
-            <div>
-              <h3>Detection Metrics</h3>
-              <table border="1" cellPadding="10" style={{ borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f0f0f0' }}>
-                    <th>Track ID</th>
-                    <th>Label</th>
-                    <th>Time on Screen (s)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tracks.map(track => (
-                    <tr key={track.track_id}>
-                      <td>{track.track_id}</td>
-                      <td>{track.label}</td>
-                      <td>{track.time_on_screen_s}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {isProcessing && (
+            <div className="progress-container">
+              <p className="progress-text">Running YOLO tracking: {percent}%</p>
+              <progress value={percent} max={100} />
             </div>
           )}
         </div>
-      )}
+
+        {videoUrl && (
+          <div className="results-grid">
+            <div className="card">
+              <h3>Annotated Video</h3>
+              <video src={videoUrl} controls />
+            </div>
+
+            {heatmapUrl && (
+              <div className="card">
+                <h3>Position Heatmap</h3>
+                <img src={heatmapUrl} alt="Salamander Position Heatmap" className="heatmap-img" />
+              </div>
+            )}
+            
+            {tracks.length > 0 && (
+              <div className="card" style={{ gridColumn: '1 / -1' }}>
+                <h3>Detection Metrics</h3>
+                <table className="metrics-table">
+                  <thead>
+                    <tr>
+                      <th>Track ID</th>
+                      <th>Label</th>
+                      <th>Time on Screen (s)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tracks.map(track => (
+                      <tr key={track.track_id}>
+                        <td>{track.track_id}</td>
+                        <td>{track.label}</td>
+                        <td>{track.time_on_screen_s}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
