@@ -1,4 +1,11 @@
 # Salamander YOLO..
 
 
-Testing changes made in wsl
+### Run Instructions
+...
+
+### Answers to Dataset Questions
+...
+
+### Comparison Paragraph
+...

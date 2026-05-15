@@ -4,7 +4,7 @@ import os
 
 os.makedirs("backend/outputs", exist_ok=True)
 
-# Load your trained model
+# Load the trained model
 model = YOLO('backend/models/salamander.pt')
 
 # Run inference on a single frame

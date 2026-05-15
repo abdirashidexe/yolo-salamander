@@ -1,3 +1,4 @@
+import numpy as np
 import time
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File
@@ -25,20 +26,21 @@ VIDEOS_DIR.mkdir(exist_ok=True)
 OUTPUTS_DIR = BASE_DIR / "outputs"
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
+# Turns the folders into mini web servers so the React frontend can directly request the video URLs and heatmap image
 app.mount("/uploads", StaticFiles(directory=str(VIDEOS_DIR)), name="uploads")
 app.mount("/outputs", StaticFiles(directory=str(OUTPUTS_DIR)), name="outputs")
 
 MODEL_PATH = BASE_DIR / "models" / "salamander.pt"
 model = YOLO(str(MODEL_PATH))
 
-# --- NEW: Shared state dict to track job progress ---
+# Shared state dict to track job progress
 job = {"status": "idle"}
 
 @app.get("/")
 def root():
     return {"ok": True}
 
-# --- NEW: The Background Worker Function ---
+# The Background Worker Function
 def run_track_job():
     try:
         input_path = VIDEOS_DIR / "input.mp4"
@@ -58,6 +60,13 @@ def run_track_job():
 
         frames_seen = defaultdict(int)
         label_for = {}
+        
+        # Capture the first frame to use as our background
+        ok, first_frame = cap.read()
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset video to start for the tracking loop
+
+        # HEATMAP: Create a blank grayscale canvas
+        heatmap_data = np.zeros((height, width), dtype=np.float32)
 
         for frame_idx in range(total):
             ok, frame = cap.read()
@@ -69,16 +78,41 @@ def run_track_job():
             
             boxes = result.boxes
             if boxes is not None and boxes.id is not None:
-                for tid, cls_id in zip(boxes.id.tolist(), boxes.cls.tolist()):
+                # We need xywh (x-center, y-center, width, height) for the heatmap
+                for box, tid, cls_id in zip(boxes.xywh.tolist(), boxes.id.tolist(), boxes.cls.tolist()):
                     frames_seen[int(tid)] += 1
                     label_for[int(tid)] = model.names[int(cls_id)]
+                    
+                    # Draw a point at the center of the salamander
+                    cx, cy = int(box[0]), int(box[1])
+                    cv2.circle(heatmap_data, (cx, cy), 15, (1,), -1)
             
-            # --- NEW: Update progress percentage every frame ---
             job["percent"] = int((frame_idx + 1) / total * 100)
 
         cap.release()
         writer.release()
         
+        # HEATMAP: Process and save the final image
+        heatmap_blurred = cv2.GaussianBlur(heatmap_data, (51, 51), 0)
+        heatmap_norm = cv2.normalize(heatmap_blurred, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        heatmap_colored = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_JET)
+        
+        # HEATMAP: Blend the heat onto the actual video background
+        # 1. Create a mask where there is actual "heat" (ignore the empty zero areas)
+        mask = heatmap_norm > 5 
+        
+        # 2. Expand mask to 3 color channels so it matches the image format
+        mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+        
+        # 3. Blend the background frame and the colored heatmap (40% background, 60% heat)
+        blended = cv2.addWeighted(first_frame, 0.4, heatmap_colored, 0.6, 0)
+        
+        # 4. Paste the blended heat onto the original frame ONLY where the salamander moved
+        final_overlay = np.where(mask_3d, blended, first_frame)
+        
+        heatmap_path = OUTPUTS_DIR / "heatmap.jpg"
+        cv2.imwrite(str(heatmap_path), final_overlay)
+
         tracks = [
             {
                 "track_id": tid,
@@ -88,12 +122,12 @@ def run_track_job():
             for tid, count in frames_seen.items()
         ]
 
-        # --- NEW: Mark job as done and save the payload ---
         job.clear()
         job["status"] = "done"
         job["percent"] = 100
         job["result"] = {
             "video_url": f"http://localhost:8000/outputs/output.webm?t={int(time.time())}",
+            "heatmap_url": f"http://localhost:8000/outputs/heatmap.jpg?t={int(time.time())}",
             "tracks": tracks,
         }
 
@@ -104,7 +138,7 @@ def run_track_job():
         job["message"] = str(e)
 
 
-# --- UPDATED: POST endpoint now starts a thread and returns immediately ---
+# POST endpoint starts a thread and returns status immediately
 @app.post("/track")
 def start_track(video: UploadFile = File(...)):
     input_path = VIDEOS_DIR / "input.mp4"
@@ -115,12 +149,12 @@ def start_track(video: UploadFile = File(...)):
     job["status"] = "processing"
     job["percent"] = 0
     
-    # Fire off the worker in the background
+    # Start the worker in the background
     Thread(target=run_track_job, daemon=True).start()
     
     return {"status": "processing"}
 
-# --- NEW: GET endpoint for the frontend to poll ---
+# GET endpoint for the frontend to poll
 @app.get("/track")
 def get_track():
     return job

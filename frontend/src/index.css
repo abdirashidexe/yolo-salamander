@@ -11,7 +11,7 @@
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
     --bg: #111827;
     --surface: #1f2937;
@@ -70,7 +70,7 @@ h3 {
   padding: 6px 12px;
   background-color: rgba(170, 59, 255, 0.1);
   border-radius: 6px;
-  transition: all 0.2s;
+  transition: all 0.10s;
 }
 
 .nav-links a:hover {

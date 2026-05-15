@@ -68,7 +68,6 @@ export default function App() {
         
         {/* Route Links opening in new tabs */}
         <div className="nav-links">
-          <a href="http://localhost:5173/" target="_blank" rel="noopener noreferrer">Frontend Home</a>
           <a href="http://localhost:8000/" target="_blank" rel="noopener noreferrer">Backend Health</a>
           <a href="http://localhost:8000/track" target="_blank" rel="noopener noreferrer">API Polling (/track)</a>
         </div>

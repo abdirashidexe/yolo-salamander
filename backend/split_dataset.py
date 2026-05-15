@@ -5,7 +5,7 @@ import os
 import random
 import shutil
 
-# paths (IMPORTANT: matches your repo)
+# paths (IMPORTANT: ensure matche repo)
 image_dir = "backend/dataset/images"
 label_dir = "backend/dataset/labels"
 

@@ -1,8 +1,0 @@
-# not sure if this is just a duplicate file
-path: .
-train: images/train
-val: images/val
-
-nc: 1
-names:
-  0: salamander
