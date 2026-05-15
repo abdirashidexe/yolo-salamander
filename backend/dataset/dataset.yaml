@@ -1,4 +1,5 @@
-path: /home/shawnN003/yolo-salamander/backend/dataset
+# not sure if this is just a duplicate file
+path: .
 train: images/train
 val: images/val
 

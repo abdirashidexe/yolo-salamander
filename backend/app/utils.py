@@ -1,1 +1,0 @@
-# Helper functions for file handling and video utilities

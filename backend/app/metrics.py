@@ -1,1 +1,0 @@
-# Functions for calculating salamander tracking metrics

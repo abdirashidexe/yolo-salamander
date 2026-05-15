@@ -1,8 +1,11 @@
 from ultralytics import YOLO
 import cv2
+import os
+
+os.makedirs("backend/outputs", exist_ok=True)
 
 # Load your trained model
-model = YOLO('models/salamander.pt')
+model = YOLO('backend/models/salamander.pt')
 
 # Run inference on a single frame
 results = model('uploads/frames/frame_0001.jpg')
@@ -10,7 +13,7 @@ results = model('uploads/frames/frame_0001.jpg')
 # Draw the bounding boxes and save the output
 for r in results:
     annotated = r.plot()  # draws boxes directly onto the image
-    cv2.imwrite('outputs/test_single.jpg', annotated)
+    cv2.imwrite('backend/outputs/test_single.jpg', annotated)
     
     # Print detection info to terminal
     for box in r.boxes:
@@ -19,4 +22,4 @@ for r in results:
         conf = box.conf[0]
         print(f"Detected salamander at center ({cx:.1f}, {cy:.1f}) with confidence {conf:.2f}")
 
-print("Saved to outputs/test_single.jpg")
+print("Saved to backend/outputs/test_single.jpg")

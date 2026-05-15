@@ -1,8 +1,11 @@
 from ultralytics import YOLO
 import cv2
+import os
+
+os.makedirs("backend/outputs", exist_ok=True)
 
 # Load your trained model
-model = YOLO('models/salamander.pt')
+model = YOLO('backend/models/salamander.pt')
 
 # Open the source video
 cap = cv2.VideoCapture('uploads/Salamander.mp4')
@@ -14,7 +17,7 @@ height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 # Set up the output video writer
 out = cv2.VideoWriter(
-    'outputs/annotated_video.mp4',
+    'backend/outputs/annotated_video.mp4',
     cv2.VideoWriter_fourcc(*'mp4v'),
     fps,
     (width, height)
@@ -42,4 +45,4 @@ while cap.isOpened():
 cap.release()
 out.release()
 print(f"Done. Processed {frame_count} frames.")
-print("Saved to outputs/annotated_video.mp4")
+print("Saved to backend/outputs/annotated_video.mp4")
