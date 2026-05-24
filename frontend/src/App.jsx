@@ -68,6 +68,7 @@ export default function App() {
         
         {/* Route Links opening in new tabs */}
         <div className="nav-links">
+          <a href="https://github.com/abdirashidexe/yolo-salamander/blob/main/README.md" target="_blank" rel="noopener noreferrer">README.md</a>
           <a href="http://localhost:8000/" target="_blank" rel="noopener noreferrer">Backend Health</a>
           <a href="http://localhost:8000/track" target="_blank" rel="noopener noreferrer">API Polling (/track)</a>
         </div>
